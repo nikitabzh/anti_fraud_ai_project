@@ -1,6 +1,5 @@
 """Лабораторная 10. Прямой вывод; запуск из любой папки, без изменения DWH."""
 import argparse
-import csv
 import json
 import os
 import sqlite3
@@ -96,6 +95,7 @@ def load_records(limit, postgres_dsn=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--limit', type=int, default=1000)
+    parser.add_argument('--examples', action='store_true', help='Показать объяснения решений в консоли')
     parser.add_argument('--postgres', action='store_true', help='Использовать переменную POSTGRES_DSN')
     args = parser.parse_args()
     dsn = os.environ['POSTGRES_DSN'] if args.postgres else None
@@ -122,14 +122,14 @@ def main():
         accuracy=(tp+tn)/len(rows),precision=p,recall=rec,f1=2*p*rec/(p+rec) if p+rec else 0,
         mean_steps=sum(r['steps'] for r in results)/len(rows),
         majority_accuracy=sum(r['actual']==0 for r in results)/len(rows))
-    out=ROOT.parent/'10 лабораторная'/'результаты'
-    out.mkdir(exist_ok=True)
-    (out/'metrics.json').write_text(json.dumps(metrics,ensure_ascii=False,indent=2),encoding='utf-8')
-    (out/'traces.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')
-    with (out/'predictions.csv').open('w',encoding='utf-8-sig',newline='') as f:
-        keys=['transaction_id','actual','predicted','decision','risk_score','steps']
-        writer=csv.DictWriter(f,fieldnames=keys,extrasaction='ignore'); writer.writeheader(); writer.writerows(results)
     print(json.dumps(metrics,ensure_ascii=False,indent=2))
+    if args.examples:
+        print('\nПримеры объяснений:')
+        for decision in ('Approve', 'Challenge_2FA', 'Decline_Block', 'Investigate_SOC'):
+            example = next((r for r in results if r['decision'] == decision), None)
+            if example:
+                print(f'\nТранзакция {example["transaction_id"]}: {decision}')
+                print(example['explanation'])
 
 if __name__ == '__main__':
     main()
